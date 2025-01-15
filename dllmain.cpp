@@ -5,12 +5,15 @@
 #include <windows.media.h>
 #include <windows.media.control.h>
 #include <wrl/event.h>
+#include <roapi.h>
 
 #pragma comment(lib, "RuntimeObject.lib")
 
 using namespace Microsoft::WRL;
 using namespace ABI::Windows::Media;
 using ABI::Windows::Foundation::ITypedEventHandler;
+using ABI::Windows::Foundation::TimeSpan;
+using Microsoft::WRL::Wrappers::HStringReference;
 
 typedef ITypedEventHandler<SystemMediaTransportControls*, SystemMediaTransportControlsButtonPressedEventArgs*> ButtonPressCallback;
 typedef ITypedEventHandler<SystemMediaTransportControls*, PlaybackPositionChangeRequestedEventArgs*> SeekCallback;
@@ -29,24 +32,20 @@ bool seekEventsRegistered = false;
 void (*extButtonCallback)(int);
 void (*extSeekCallback)(int);
 
+#define IFFAILRET(hr) if (FAILED((hr))) return (hr)
+
 __declspec(dllexport)
 int InitializeForWindow(HWND hwnd, void (*btnCallback)(int smtcBtn), void (*seekCallback)(int millis)) {
     HRESULT hr;
-
     extButtonCallback = btnCallback;
     extSeekCallback = seekCallback;
 
     ComPtr<ISystemMediaTransportControlsInterop> interop;
-    HSTRING strRef = Microsoft::WRL::Wrappers::HStringReference(RuntimeClass_Windows_Media_SystemMediaTransportControls).Get();
-    hr = Windows::Foundation::GetActivationFactory(strRef, &interop);
-    if (FAILED(hr)) {
-        return hr;
-    }
-
+    auto strRef = HStringReference(RuntimeClass_Windows_Media_SystemMediaTransportControls);
+    hr = Windows::Foundation::GetActivationFactory(strRef.Get(), &interop);
+    IFFAILRET(hr);
     hr = interop->GetForWindow(hwnd, IID_PPV_ARGS(&smtc));
-    if (FAILED(hr)) {
-        return hr;
-    }
+    IFFAILRET(hr);
 
     smtc->put_IsEnabled(true);
     smtc->put_PlaybackStatus(MediaPlaybackStatus_Stopped);
@@ -57,17 +56,13 @@ int InitializeForWindow(HWND hwnd, void (*btnCallback)(int smtcBtn), void (*seek
     smtc->put_IsStopEnabled(true);
 
     hr = smtc->get_DisplayUpdater(&displayUpdater);
-    if (FAILED(hr)) {
-        return hr;
-    }
+    IFFAILRET(hr);
     displayUpdater->put_Type(MediaPlaybackType_Music);
     displayUpdater->Update();
 
     ComPtr<ButtonPressCallback> cbBtnPressed = Callback<ButtonPressCallback>(on_button_pressed);
     hr = smtc->add_ButtonPressed(cbBtnPressed.Get(), &btnEvtTkn);
-    if (FAILED(hr)) {
-        return hr;
-    }
+    IFFAILRET(hr);
     btnEventsRegistered = true;
 
     ComPtr<ISystemMediaTransportControls2> smtc2;
@@ -128,26 +123,47 @@ int UpdateMetadata(wchar_t* title, wchar_t* artist) {
     ComPtr<IMusicDisplayProperties> props;
     
     hr = displayUpdater->get_MusicProperties(&props);
-    if (FAILED(hr)) {
-        return hr;
-    }
-
+    IFFAILRET(hr);
+ 
     HSTRING hString;
     hr = WindowsCreateString(title, lstrlenW(title), &hString);
-    if (FAILED(hr)) {
-        return hr;
-    }
+    IFFAILRET(hr);
     props->put_Title(hString);
     WindowsDeleteString(hString);
 
     hr = WindowsCreateString(artist, lstrlenW(artist), &hString);
-    if (FAILED(hr)) {
-        return hr;
-    }
+    IFFAILRET(hr);
     props->put_Artist(hString);
     WindowsDeleteString(hString);
 
     return displayUpdater->Update();
+}
+
+__declspec(dllexport)
+int UpdatePosition(int posMillis, int durationMillis) {
+    HRESULT hr;
+    ComPtr<ISystemMediaTransportControls2> smtc2;
+    hr = smtc.As(&smtc2);
+    IFFAILRET(hr);
+
+    ComPtr<ISystemMediaTransportControlsTimelineProperties> timeProps;
+    auto strRef = HStringReference(RuntimeClass_Windows_Media_SystemMediaTransportControlsTimelineProperties);
+    hr = RoActivateInstance(strRef.Get(), &timeProps);
+    IFFAILRET(hr);
+
+    TimeSpan timeZero = { 0 };
+    timeProps->put_MinSeekTime(timeZero);
+    timeProps->put_StartTime(timeZero);
+
+    TimeSpan curPos;
+    curPos.Duration = long(posMillis) * 1000000;
+    TimeSpan dur;
+    dur.Duration = long(durationMillis) * 1000000;
+    timeProps->put_MaxSeekTime(dur);
+    timeProps->put_EndTime(dur);
+    timeProps->put_Position(curPos);
+
+    return 0;
 }
 
 int on_button_pressed(ISystemMediaTransportControls*, ISystemMediaTransportControlsButtonPressedEventArgs* args) {
@@ -156,11 +172,8 @@ int on_button_pressed(ISystemMediaTransportControls*, ISystemMediaTransportContr
     }
 
     SystemMediaTransportControlsButton btn;
-
     HRESULT hr = args->get_Button(&btn);
-    if (FAILED(hr)) {
-        return hr;
-    }
+    IFFAILRET(hr);
 
     switch (btn) {
     case SystemMediaTransportControlsButton_Play:
@@ -189,9 +202,7 @@ int on_seek(ISystemMediaTransportControls*, IPlaybackPositionChangeRequestedEven
     }
     ABI::Windows::Foundation::TimeSpan time;
     HRESULT hr = args->get_RequestedPlaybackPosition(&time);
-    if (FAILED(hr)) {
-        return hr;
-    }
+    IFFAILRET(hr);
     int millis = int(time.Duration / 1000000);
 
     extSeekCallback(millis);
