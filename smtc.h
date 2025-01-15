@@ -21,5 +21,8 @@ extern "C" {
 		int UpdateMetadata(wchar_t* title, wchar_t* artist);
 
 	__declspec(dllexport)
+		int UpdatePosition(int posMillis, int durationMillis);
+
+	__declspec(dllexport)
 		int Destroy();
 };
