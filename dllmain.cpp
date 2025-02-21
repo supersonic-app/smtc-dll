@@ -44,7 +44,6 @@ int InitializeForWindow(HWND hwnd, void (*btnCallback)(int smtcBtn), void (*seek
 
     auto updater = smtc.DisplayUpdater();
     updater.Type(MediaPlaybackType::Music);
-    updater.MusicProperties().Title(winrt::to_hstring(appName));
     updater.Update();
 
     smtc.ButtonPressed([&](const SystemMediaTransportControls&, const SystemMediaTransportControlsButtonPressedEventArgs& args) {
@@ -149,10 +148,14 @@ int SetPosition(int posMillis, int durationMillis) {
 
 __declspec(dllexport)
 int SetThumbnailPath(wchar_t* filepath) {
-    StorageFile storageFile = StorageFile::GetFileFromPathAsync(winrt::to_hstring(filepath)).get();
-    RandomAccessStreamReference ref = RandomAccessStreamReference::CreateFromFile(storageFile);
-    auto updater = smtc.DisplayUpdater();
-    updater.Thumbnail(ref);
-    updater.Update();
+    try {
+        StorageFile storageFile = StorageFile::GetFileFromPathAsync(winrt::to_hstring(filepath)).get();
+        RandomAccessStreamReference ref = RandomAccessStreamReference::CreateFromFile(storageFile);
+        auto updater = smtc.DisplayUpdater();
+        updater.Thumbnail(ref);
+        updater.Update();
+    } catch (winrt::hresult_error e){
+        return e.code();
+    }
     return 0;
 }
