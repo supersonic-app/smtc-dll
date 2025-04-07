@@ -131,6 +131,7 @@ int ClearAll() {
     auto updater = smtc.DisplayUpdater();
     updater.ClearAll();
     updater.Update();
+    return 0;
 }
 
 __declspec(dllexport)
