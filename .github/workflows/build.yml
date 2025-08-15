@@ -1,4 +1,4 @@
-name: Build x64
+name: Build x64 + ARM64
 
 on:
   push:
@@ -19,15 +19,23 @@ jobs:
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.0.2
 
-    - name: Build
-      working-directory: ${{env.GITHUB_WORKSPACE}}
+    - name: Build x64
       # Add additional options to the MSBuild command line here (like platform or verbosity level).
       # See https://docs.microsoft.com/visualstudio/msbuild/msbuild-command-line-reference
       run: msbuild SMTC.sln /p:Configuration=Release /p:Platform=x64
 
-    - name: Upload Build Artifacts
+    - name: Build arm64
+      run: msbuild SMTC.sln /p:Configuration=Release /p:Platform=ARM64
+
+    - name: Upload x64
       uses: actions/upload-artifact@v4
       with:
-        name: SMTC.dll
+        name: SMTC_x64.dll
         path: x64/Release/SMTC.dll
+
+    - name: Upload arm64
+      uses: actions/upload-artifact@v4
+      with:
+        name: SMTC_arm64.dll
+        path: ARM64/Release/SMTC.dll
     
