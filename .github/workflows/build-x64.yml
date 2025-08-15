@@ -29,5 +29,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: SMTC.dll
-        path: smtc-dll/x64/Release/SMTC.dll
+        path: x64/Release/SMTC.dll
     
